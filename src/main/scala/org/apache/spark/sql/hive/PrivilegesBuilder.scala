@@ -123,7 +123,7 @@ private[sql] object PrivilegesBuilder {
         // Unfortunately, the real world is always a place where miracles happen.
         // We check the privileges directly without resolving the plan and leave everything
         // to spark to do.
-        addTableOrViewLevelObjs(u.tableIdentifier, hivePrivilegeObjects)
+//        addTableOrViewLevelObjs(u.tableIdentifier, hivePrivilegeObjects) //SPARK-27322
 
       case p =>
         for (child <- p.children) {
@@ -169,9 +169,9 @@ private[sql] object PrivilegesBuilder {
         addTableOrViewLevelObjs(a.tableName, inputObjs)
         addTableOrViewLevelObjs(a.tableName, outputObjs)
 
-      case a: AlterTableRecoverPartitionsCommand =>
-        addTableOrViewLevelObjs(a.tableName, inputObjs)
-        addTableOrViewLevelObjs(a.tableName, outputObjs)
+//      case a: AlterTableRecoverPartitionsCommand =>
+//        addTableOrViewLevelObjs(a.tableName, inputObjs)
+//        addTableOrViewLevelObjs(a.tableName, outputObjs)
 
       case a: AlterTableRenameCommand if !a.isView || a.oldName.database.nonEmpty =>
         // rename tables / permanent views
@@ -205,11 +205,11 @@ private[sql] object PrivilegesBuilder {
         }
         buildQuery(a.query, inputObjs)
 
-      case a: AnalyzeColumnCommand =>
-        addTableOrViewLevelObjs(
-          a.tableIdent, inputObjs, columns = a.columnNames)
-        addTableOrViewLevelObjs(
-          a.tableIdent, outputObjs, columns = a.columnNames)
+//      case a: AnalyzeColumnCommand =>
+//        addTableOrViewLevelObjs(
+//          a.tableIdent, inputObjs, columns = a.columnNames)
+//        addTableOrViewLevelObjs(
+//          a.tableIdent, outputObjs, columns = a.columnNames)
 
       case a if a.nodeName == "AnalyzePartitionCommand" =>
         addTableOrViewLevelObjs(
@@ -221,9 +221,9 @@ private[sql] object PrivilegesBuilder {
         addTableOrViewLevelObjs(a.tableIdent, inputObjs, columns = Seq("RAW__DATA__SIZE"))
         addTableOrViewLevelObjs(a.tableIdent, outputObjs)
 
-      case c: CacheTableCommand => c.plan.foreach {
-        buildQuery(_, inputObjs)
-      }
+//      case c: CacheTableCommand => c.plan.foreach {
+//        buildQuery(_, inputObjs)
+//      }
 
       case c: CreateDatabaseCommand => addDbLevelObjs(c.databaseName, outputObjs)
 
@@ -254,15 +254,15 @@ private[sql] object PrivilegesBuilder {
         addDbLevelObjs(c.sourceTable, inputObjs)
         addTableOrViewLevelObjs(c.sourceTable, inputObjs)
 
-      case c: CreateViewCommand =>
-        c.viewType match {
-          case PersistedView =>
-            // PersistedView will be tied to a database
-            addDbLevelObjs(c.name, outputObjs)
-            addTableOrViewLevelObjs(c.name, outputObjs)
-          case _ =>
-        }
-        buildQuery(c.child, inputObjs)
+//      case c: CreateViewCommand =>
+//        c.viewType match {
+//          case PersistedView =>
+//            // PersistedView will be tied to a database
+//            addDbLevelObjs(c.name, outputObjs)
+//            addTableOrViewLevelObjs(c.name, outputObjs)
+//          case _ =>
+//        }
+//        buildQuery(c.child, inputObjs)
 
       case d if d.nodeName == "DescribeColumnCommand" =>
         addTableOrViewLevelObjs(
@@ -328,7 +328,7 @@ private[sql] object PrivilegesBuilder {
       case s if s.nodeName == "SaveIntoDataSourceCommand" =>
         buildQuery(getFieldVal(s, "query").asInstanceOf[LogicalPlan], outputObjs)
 
-      case s: SetDatabaseCommand => addDbLevelObjs(s.databaseName, inputObjs)
+//      case s: SetDatabaseCommand => addDbLevelObjs(s.databaseName, inputObjs)
 
       case s: ShowColumnsCommand => addTableOrViewLevelObjs(s.tableName, inputObjs)
 

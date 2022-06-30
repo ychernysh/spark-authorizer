@@ -18,13 +18,12 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import java.io.File
-
 import com.githup.yaooqinn.spark.authorizer.Logging
 import org.apache.hadoop.hive.ql.plan.HiveOperation
 import org.apache.hadoop.hive.ql.security.authorization.plugin.{HiveAuthzContext, HiveOperationType}
-
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{Command, LogicalPlan}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
+import org.apache.spark.sql.catalyst.plans.logical.{CacheTable, Command, LogicalPlan, SetCatalogAndNamespace, ShowNamespaces}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTempViewUsing, InsertIntoDataSourceCommand, InsertIntoHadoopFsRelationCommand}
@@ -50,7 +49,7 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
     val operationType: HiveOperationType = getOperationType(plan)
     val authzContext = new HiveAuthzContext.Builder().build()
     val (in, out) = PrivilegesBuilder.build(plan)
-    spark.sharedState.externalCatalog match {
+    spark.sharedState.externalCatalog.unwrapped match {
       case _: HiveExternalCatalog =>
         AuthzImpl.checkPrivileges(spark, operationType, in, out, authzContext)
       case _ =>
@@ -106,7 +105,7 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
         case p if p.nodeName == "AlterTableChangeColumnCommand" =>
           HiveOperation.ALTERTABLE_RENAMECOL
         case _: AlterTableDropPartitionCommand => HiveOperation.ALTERTABLE_DROPPARTS
-        case _: AlterTableRecoverPartitionsCommand => HiveOperation.MSCK
+        case _: RepairTableCommand => HiveOperation.MSCK // SPARK-34518
         case _: AlterTableRenamePartitionCommand => HiveOperation.ALTERTABLE_RENAMEPART
         case a: AlterTableRenameCommand =>
           if (!a.isView) HiveOperation.ALTERTABLE_RENAME else HiveOperation.ALTERVIEW_RENAME
@@ -131,7 +130,7 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
              | _: CreateDataSourceTableCommand => HiveOperation.CREATETABLE
         case _: CreateTableLikeCommand => HiveOperation.CREATETABLE
         case _: CreateViewCommand
-             | _: CacheTableCommand
+             | _: CacheTable // SPARK-33654
              | _: CreateTempViewUsing => HiveOperation.CREATEVIEW
 
         case p if p.nodeName == "DescribeColumnCommand" => HiveOperation.DESCTABLE
@@ -159,10 +158,10 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
 
         case p if p.nodeName == "SaveIntoDataSourceCommand" => HiveOperation.QUERY
         case s: SetCommand if s.kv.isEmpty || s.kv.get._2.isEmpty => HiveOperation.SHOWCONF
-        case _: SetDatabaseCommand => HiveOperation.SWITCHDATABASE
+        case _: SetCatalogAndNamespace => HiveOperation.SWITCHDATABASE // SPARK-29279 ???
         case _: ShowCreateTableCommand => HiveOperation.SHOW_CREATETABLE
         case _: ShowColumnsCommand => HiveOperation.SHOWCOLUMNS
-        case _: ShowDatabasesCommand => HiveOperation.SHOWDATABASES
+        case _: ShowNamespaces => HiveOperation.SHOWDATABASES // SPARK-29279
         case _: ShowFunctionsCommand => HiveOperation.SHOWFUNCTIONS
         case _: ShowPartitionsCommand => HiveOperation.SHOWPARTITIONS
         case _: ShowTablesCommand => HiveOperation.SHOWTABLES
@@ -172,7 +171,7 @@ trait Authorizable extends Rule[LogicalPlan] with Logging {
 
         case _: TruncateTableCommand => HiveOperation.TRUNCATETABLE
 
-        case _: UncacheTableCommand => HiveOperation.DROPVIEW
+        case _: UnresolvedRelation => HiveOperation.DROPVIEW // SPARK-33765
 
         // Commands that do not need build privilege goes as explain type
         case _ =>
